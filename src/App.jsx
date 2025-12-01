@@ -1,5 +1,11 @@
+
 import { useEffect, useState } from 'react'
 import { createItem, updateItem, deleteItem, getItem } from './api'
+import UserList from './components/UserList.jsx'
+import Pagination from './components/Pagination.jsx'
+import CreateEditModal from './components/CreateEditModal.jsx'
+import DeleteConfirmationModal from './components/DeleteConfirmationModal.jsx'
+import ImportIdsModal from './components/ImportIdsModal.jsx'
 
 function App() {
   const [myItems, setMyItems] = useState([])
@@ -184,6 +190,29 @@ function App() {
     }
   }
 
+  async function importIdsFromText(text) {
+    const ids = Array.from(new Set((text.match(/[a-f0-9]{32}/gi) || []).map((s) => s.trim())))
+    if (!ids.length) { addToast('error', 'No IDs found in text'); return }
+    setBusy(true)
+    try {
+      const fetched = await Promise.all(ids.map(async (id) => {
+        try { return await getItem(id) } catch { return null }
+      }))
+      const valid = fetched.filter(Boolean)
+      const existing = loadIds()
+      const merged = Array.from(new Set([...(existing || []), ...valid.map((x) => x.id)]))
+      saveIds(merged)
+      setMyItems(valid)
+      addToast('success', `Imported ${valid.length} user(s)`) 
+      setShowImport(false)
+      setIdsText('')
+    } catch (e) {
+      addToast('error', e.message || 'Import failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       <div className="max-w-4xl mx-auto p-6">
@@ -223,196 +252,50 @@ function App() {
               Refresh
             </button>
           </div>
-          {loading ? (
-            <div className="p-4 text-gray-600">Loading...</div>
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {myItems.slice((page - 1) * pageSize, page * pageSize).map((item) => (
-                <li key={item.id} className="p-4 flex items-start justify-between gap-4">
-                  <div>
-                    <div className="font-semibold text-gray-900">{item.name}</div>
-                    <div className="text-sm text-gray-600">
-                      {item?.data?.email && <span className="mr-3">{item.data.email}</span>}
-                      {item?.data?.role && <span className="mr-3">{item.data.role}</span>}
-                      <span className="text-xs text-gray-400">id: {item.id}</span>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => startEdit(item)}
-                      className="rounded-md border border-gray-300 px-3 py-1 text-gray-800 hover:bg-gray-50"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => setConfirmDeleteId(item.id)}
-                      className="rounded-md bg-red-600 px-3 py-1 text-white hover:bg-red-700"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </li>
-              ))}
-              {myItems.length === 0 && (
-                <li className="p-4 text-gray-600">No items found. Create one above.</li>
-              )}
-            </ul>
-          )}
+          <UserList
+            items={myItems.slice((page - 1) * pageSize, page * pageSize)}
+            loading={loading}
+            onEdit={startEdit}
+            onDeleteRequest={(id) => setConfirmDeleteId(id)}
+          />
           {!loading && myItems.length > 0 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-              <div className="text-sm text-gray-600">Page {page} of {Math.max(1, Math.ceil(myItems.length / pageSize))}</div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                  className={`rounded-md border px-3 py-1 text-sm ${page <= 1 ? 'text-gray-400 bg-gray-100' : 'hover:bg-gray-50'}`}
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setPage((p) => Math.min(Math.ceil(myItems.length / pageSize), p + 1))}
-                  disabled={page >= Math.ceil(myItems.length / pageSize)}
-                  className={`rounded-md border px-3 py-1 text-sm ${page >= Math.ceil(myItems.length / pageSize) ? 'text-gray-400 bg-gray-100' : 'hover:bg-gray-50'}`}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={myItems.length}
+              onChange={setPage}
+            />
           )}
         </div>
 
         {/* Create/Edit Modal */}
-        {showModal && (
-          <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4">
-            <div className="w-full max-w-md rounded-lg bg-white shadow-lg">
-              <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                <div className="font-semibold">{modalMode === 'edit' ? 'Edit User' : 'Add User'}</div>
-                <button onClick={() => { setShowModal(false); resetForm(); }} className="text-gray-500 hover:text-gray-700">✕</button>
-              </div>
-              <form
-                onSubmit={onSubmit}
-                className="p-4 space-y-3"
-              >
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                  <input
-                    className={`w-full rounded-md border px-3 py-2 focus:outline-none focus:ring-2 ${formErrors.name ? 'border-red-300 focus:ring-red-400' : 'border-gray-300 focus:ring-blue-500'}`}
-                    placeholder="Name"
-                    value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  />
-                  {formErrors.name && <div className="mt-1 text-xs text-red-600">{formErrors.name}</div>}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input
-                    className={`w-full rounded-md border px-3 py-2 focus:outline-none focus:ring-2 ${formErrors.email ? 'border-red-300 focus:ring-red-400' : 'border-gray-300 focus:ring-blue-500'}`}
-                    placeholder="Email"
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  />
-                  {formErrors.email && <div className="mt-1 text-xs text-red-600">{formErrors.email}</div>}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                  <select
-                    className={`w-full rounded-md border px-3 py-2 focus:outline-none focus:ring-2 ${formErrors.role ? 'border-red-300 focus:ring-red-400' : 'border-gray-300 focus:ring-blue-500'}`}
-                    value={form.role}
-                    onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-                  >
-                    <option value="">Select role</option>
-                    <option value="admin">Admin</option>
-                    <option value="user">User</option>
-                    <option value="viewer">Viewer</option>
-                  </select>
-                  {formErrors.role && <div className="mt-1 text-xs text-red-600">{formErrors.role}</div>}
-                </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => { setShowModal(false); resetForm(); }}
-                    className="rounded-md bg-gray-200 px-4 py-2 text-gray-800 hover:bg-gray-300"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={busy}
-                    className={`rounded-md px-4 py-2 text-white transition ${busy ? 'bg-blue-300' : 'bg-blue-600 hover:bg-blue-700'}`}
-                  >
-                    {modalMode === 'edit' ? 'Update' : 'Create'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+        <CreateEditModal
+          visible={showModal}
+          mode={modalMode}
+          form={form}
+          errors={formErrors}
+          busy={busy}
+          onClose={() => { setShowModal(false); resetForm(); }}
+          onChange={(field, value) => setForm((f) => ({ ...f, [field]: value }))}
+          onSubmit={onSubmit}
+        />
 
         {/* Delete Confirmation Modal */}
-        {confirmDeleteId && (
-          <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4">
-            <div className="w-full max-w-sm rounded-lg bg-white shadow-lg">
-              <div className="px-4 py-3 border-b border-gray-200 font-semibold">Delete User</div>
-              <div className="p-4 text-sm text-gray-700">Are you sure you want to delete this user?</div>
-              <div className="flex justify-end gap-2 px-4 pb-4">
-                <button onClick={() => setConfirmDeleteId(null)} className="rounded-md bg-gray-200 px-4 py-2 text-gray-800 hover:bg-gray-300">Cancel</button>
-                <button onClick={() => { const id = confirmDeleteId; setConfirmDeleteId(null); onDelete(id); }} className="rounded-md bg-red-600 px-4 py-2 text-white hover:bg-red-700">Delete</button>
-              </div>
-            </div>
-          </div>
-        )}
+        <DeleteConfirmationModal
+          visible={!!confirmDeleteId}
+          onCancel={() => setConfirmDeleteId(null)}
+          onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); onDelete(id); }}
+        />
 
         {/* Import IDs Modal */}
-        {showImport && (
-          <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4">
-            <div className="w-full max-w-md rounded-lg bg-white shadow-lg">
-              <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                <div className="font-semibold">Import Existing User IDs</div>
-                <button onClick={() => { setShowImport(false); setIdsText(''); }} className="text-gray-500 hover:text-gray-700">✕</button>
-              </div>
-              <div className="p-4 space-y-3">
-                <div className="text-sm text-gray-600">Paste comma or line-separated IDs created previously.</div>
-                <textarea
-                  className="w-full h-32 rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="id1, id2, id3"
-                  value={idsText}
-                  onChange={(e) => setIdsText(e.target.value)}
-                />
-                <div className="flex justify-end gap-2">
-                  <button onClick={() => { setShowImport(false); setIdsText(''); }} className="rounded-md bg-gray-200 px-4 py-2 text-gray-800 hover:bg-gray-300">Cancel</button>
-                  <button
-                    onClick={async () => {
-                      const ids = Array.from(new Set((idsText.match(/[a-f0-9]{32}/gi) || []).map((s) => s.trim())))
-                      if (!ids.length) { addToast('error', 'No IDs found in text'); return }
-                      setBusy(true)
-                      try {
-                        const fetched = await Promise.all(ids.map(async (id) => {
-                          try { return await getItem(id) } catch { return null }
-                        }))
-                        const valid = fetched.filter(Boolean)
-                        const existing = loadIds()
-                        const merged = Array.from(new Set([...(existing || []), ...valid.map((x) => x.id)]))
-                        saveIds(merged)
-                        setMyItems(valid)
-                        addToast('success', `Imported ${valid.length} user(s)`) 
-                        setShowImport(false)
-                        setIdsText('')
-                      } catch (e) {
-                        addToast('error', e.message || 'Import failed')
-                      } finally {
-                        setBusy(false)
-                      }
-                    }}
-                    className={`rounded-md px-4 py-2 text-white ${busy ? 'bg-blue-300' : 'bg-blue-600 hover:bg-blue-700'}`}
-                  >
-                    Import
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <ImportIdsModal
+          visible={showImport}
+          idsText={idsText}
+          busy={busy}
+          onClose={() => { setShowImport(false); setIdsText('') }}
+          onChange={(val) => setIdsText(val)}
+          onImport={() => importIdsFromText(idsText)}
+        />
 
         {busy && (
           <div className="fixed inset-0 bg-black/20 backdrop-blur-[1px] flex items-center justify-center">
