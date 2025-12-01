@@ -3,7 +3,7 @@ import React from 'react'
 export default function UserList({ items, loading, onEdit, onDeleteRequest }) {
   if (loading) return <div className="p-4 text-gray-600">Loading...</div>
   return (
-    <ul className="divide-y divide-gray-100">
+    <ul data-testid="user-row" className="divide-y divide-gray-100">
       {items.map((item) => (
         <li key={item.id} className="p-4 flex items-start justify-between gap-4">
           <div>
@@ -18,11 +18,13 @@ export default function UserList({ items, loading, onEdit, onDeleteRequest }) {
             <button
               onClick={() => onEdit(item)}
               className="rounded-md border border-gray-300 px-3 py-1 text-gray-800 hover:bg-gray-50"
+              data-testid="edit-btn"
             >
               Edit
             </button>
             <button
               onClick={() => onDeleteRequest(item.id)}
+              data-testid="delete-btn"
               className="rounded-md bg-red-600 px-3 py-1 text-white hover:bg-red-700"
             >
               Delete

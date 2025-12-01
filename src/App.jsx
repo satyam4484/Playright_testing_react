@@ -224,6 +224,7 @@ function App() {
               setModalMode('create');
               setShowModal(true);
             }}
+            data-testid="add-user-btn"
             className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
           >
             Add User
@@ -248,7 +249,7 @@ function App() {
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
             <span className="font-medium">My Users{dummyMode ? ' (Dummy)' : ''}</span>
-            <button onClick={refresh} className="text-sm rounded-md border px-3 py-1 hover:bg-gray-50">
+            <button  data-testid="refresh-btn" onClick={refresh} className="text-sm rounded-md border px-3 py-1 hover:bg-gray-50">
               Refresh
             </button>
           </div>

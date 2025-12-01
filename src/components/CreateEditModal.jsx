@@ -3,10 +3,10 @@ import React from 'react'
 export default function CreateEditModal({ visible, mode, form, errors, busy, onClose, onChange, onSubmit }) {
   if (!visible) return null
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4" id="modal-overlay">
       <div className="w-full max-w-md rounded-lg bg-white shadow-lg">
         <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-          <div className="font-semibold">{mode === 'edit' ? 'Edit User' : 'Add User'}</div>
+          <div className="font-semibold" data-testid="modal-title" >{mode === 'edit' ? 'Edit User' : 'Add User'}</div>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
         </div>
         <form onSubmit={onSubmit} className="p-4 space-y-3">
