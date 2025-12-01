@@ -53,11 +53,23 @@ function App() {
     localStorage.setItem('userItemIds', JSON.stringify(ids))
   }
 
+  async function loadFileIds() {
+    try {
+      const res = await fetch('/src/createdIds.json', { cache: 'no-store' })
+      if (!res.ok) return []
+      const json = await res.json()
+      return Array.isArray(json) ? json : []
+    } catch {
+      return []
+    }
+  }
+
   async function refresh() {
     setLoading(true)
     setError('')
     try {
-      const ids = await loadIds()
+      const [idsLocal, idsFile] = await Promise.all([loadIds(), loadFileIds()])
+      const ids = Array.from(new Set([...(idsLocal || []), ...(idsFile || [])]))
       if (Array.isArray(ids) && ids.length) {
         const fetched = await Promise.all(
           ids.map(async (id) => {
@@ -319,8 +331,8 @@ function App() {
                   <button onClick={() => { setShowImport(false); setIdsText(''); }} className="rounded-md bg-gray-200 px-4 py-2 text-gray-800 hover:bg-gray-300">Cancel</button>
                   <button
                     onClick={async () => {
-                      const ids = Array.from(new Set(idsText.split(/[,\n\s]+/).map((s) => s.trim()).filter(Boolean)))
-                      if (!ids.length) { addToast('error', 'No IDs provided'); return }
+                      const ids = Array.from(new Set((idsText.match(/[a-f0-9]{32}/gi) || []).map((s) => s.trim())))
+                      if (!ids.length) { addToast('error', 'No IDs found in text'); return }
                       setBusy(true)
                       try {
                         const fetched = await Promise.all(ids.map(async (id) => {
@@ -331,7 +343,7 @@ function App() {
                         const merged = Array.from(new Set([...(existing || []), ...valid.map((x) => x.id)]))
                         saveIds(merged)
                         setMyItems(valid)
-                        addToast('success', 'Imported successfully')
+                        addToast('success', `Imported ${valid.length} user(s)`) 
                         setShowImport(false)
                         setIdsText('')
                       } catch (e) {
