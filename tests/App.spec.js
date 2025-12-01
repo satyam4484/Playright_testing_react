@@ -23,6 +23,7 @@ test('invalid form shows errors', async ({ page }) => {
     await expect(page.getByText('Name is required')).toBeVisible();
     await expect(page.getByText('Email is required')).toBeVisible();
     await expect(page.getByText('Role is required')).toBeVisible();
+    await page.screenshot({ path: 'screenshot.png' });
     await page.waitForTimeout(3000);
     
 })
@@ -44,4 +45,5 @@ await page.route('https://api.restful-api.dev/objects', route =>
   await page.getByRole('button', { name: 'Create' }).click();
 
   await expect(page.getByText('Failed to create item').first()).toBeVisible();
+  await page.screenshot({ path: 'error_message.png' });
 });
