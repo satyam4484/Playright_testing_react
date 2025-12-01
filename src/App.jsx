@@ -15,6 +15,9 @@ function App() {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [showImport, setShowImport] = useState(false)
   const [idsText, setIdsText] = useState('')
+  const [dummyMode, setDummyMode] = useState(false)
+  const [page, setPage] = useState(1)
+  const pageSize = 5
 
   useEffect(() => {
     refresh()
@@ -64,6 +67,17 @@ function App() {
     }
   }
 
+  async function loadDummyUsers() {
+    try {
+      const res = await fetch('/src/dummyUsers.json', { cache: 'no-store' })
+      if (!res.ok) return []
+      const json = await res.json()
+      return Array.isArray(json) ? json : []
+    } catch {
+      return []
+    }
+  }
+
   async function refresh() {
     setLoading(true)
     setError('')
@@ -80,16 +94,33 @@ function App() {
             }
           })
         )
-        setMyItems(fetched.filter(Boolean))
+        const list = fetched.filter(Boolean)
+        if (list.length) {
+          setMyItems(list)
+          setDummyMode(false)
+        } else {
+          const dummy = await loadDummyUsers()
+          setMyItems(dummy)
+          setDummyMode(true)
+        }
       } else {
-        setMyItems([])
+        const dummy = await loadDummyUsers()
+        setMyItems(dummy)
+        setDummyMode(true)
       }
     } catch (e) {
-      setError(e.message || 'Error loading items')
+      const dummy = await loadDummyUsers()
+      setMyItems(dummy)
+      setDummyMode(true)
+      setError(e.message || 'Error loading items; showing dummy data')
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    setPage(1)
+  }, [myItems])
 
   function startEdit(item) {
     setEditingId(item.id)
@@ -187,7 +218,7 @@ function App() {
 
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-            <span className="font-medium">My Users</span>
+            <span className="font-medium">My Users{dummyMode ? ' (Dummy)' : ''}</span>
             <button onClick={refresh} className="text-sm rounded-md border px-3 py-1 hover:bg-gray-50">
               Refresh
             </button>
@@ -196,7 +227,7 @@ function App() {
             <div className="p-4 text-gray-600">Loading...</div>
           ) : (
             <ul className="divide-y divide-gray-100">
-              {myItems.map((item) => (
+              {myItems.slice((page - 1) * pageSize, page * pageSize).map((item) => (
                 <li key={item.id} className="p-4 flex items-start justify-between gap-4">
                   <div>
                     <div className="font-semibold text-gray-900">{item.name}</div>
@@ -226,6 +257,27 @@ function App() {
                 <li className="p-4 text-gray-600">No items found. Create one above.</li>
               )}
             </ul>
+          )}
+          {!loading && myItems.length > 0 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+              <div className="text-sm text-gray-600">Page {page} of {Math.max(1, Math.ceil(myItems.length / pageSize))}</div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className={`rounded-md border px-3 py-1 text-sm ${page <= 1 ? 'text-gray-400 bg-gray-100' : 'hover:bg-gray-50'}`}
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.min(Math.ceil(myItems.length / pageSize), p + 1))}
+                  disabled={page >= Math.ceil(myItems.length / pageSize)}
+                  className={`rounded-md border px-3 py-1 text-sm ${page >= Math.ceil(myItems.length / pageSize) ? 'text-gray-400 bg-gray-100' : 'hover:bg-gray-50'}`}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           )}
         </div>
 
